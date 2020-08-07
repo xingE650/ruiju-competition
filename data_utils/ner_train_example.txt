@@ -1,0 +1,2 @@
+text_a	text_b	label
+情 节 特 别 严 重	本 院 认 为 ， 被 告 人 范 某 、 孙 某 以 营 利 为 目 的 ， 未 经 著 作 权 人 许 可 ， 非 法 发 行 他 人 音 像 作 品 3 1 0 0 余 张 ， 情 节 特 别 严 重 ， 其 行 为 均 构 成 侵 犯 著 作 权 罪 ， 应 予 惩 处	O O O O O O O O O O O O O O B-PER I-PER O B-PER I-PER O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
