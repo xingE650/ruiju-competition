@@ -65,6 +65,30 @@ for ind,item in enumerate(input_json):
 				else:
 					labels[_range] = "I-PER"
 					k += 1
+
+	text_c = text_b
+	# split text_c to produce new_text_c
+	new_text_c = []
+	for index, _char in enumerate(text_c):
+		if _char.strip()=="":
+			continue
+		if index == 0:
+			new_text_c.append("[PAD]")
+		else:
+			new_text_c.append(" ")
+			new_text_c.append("[PAD]")
+
+	all_candidates = item["被告人集合"]
+	for candidate in all_candidates:
+		tmp_regex = re.compile(candidate)
+		_finder = re.finditer(tmp_regex, text_c)
+		for i in _finder:
+			k=0
+			for _range in range(i.span()[0],i.span()[1]):
+				new_text_c[_range*2] = candidate[k]
+				k+=1
+	new_text_c = "".join(new_text_c)
+
 	new_labels = ""
 	for index, label in enumerate(labels):
 		if index == 0:
@@ -77,7 +101,8 @@ for ind,item in enumerate(input_json):
 		print (len(new_text_a.split(" ")),len(new_text_b.split(" ")),len(new_labels.split(" ")))
 	if len(text_a)+len(text_b)>=508:
 		print(text_a,text_b)
-	train_list.append([new_text_a,new_text_b,new_labels])
+	# 将 new_text_a(分词后的要素原始值)、new_text_b（分词后的句子）、new_text_c（和new_text_b长度一致，然后把被告人集合以外的内容换成[PAD]）、new_labels（序列标注标签）
+	train_list.append([new_text_a,new_text_b, new_text_c, new_labels])
 
 # 随机抽取10%作为测试数据
 prob = 0.1
@@ -90,11 +115,11 @@ for _index,item in enumerate(train_list):
 
 with open(os.path.join(os.getcwd(), 'data', "ner_train.tsv"),"w",encoding="utf-8")as f_train:
 	tsv_w_train = csv.writer(f_train, delimiter='\t')
-	tsv_w_train.writerow(["text_a","text_b","label"])
+	tsv_w_train.writerow(["text_a","text_b", "text_c", "label"])
 	tsv_w_train.writerows(train_list)
 with open(os.path.join(os.getcwd(), 'data', "ner_test.tsv"),"w",encoding="utf-8")as f_test:
 	tsv_w_test = csv.writer(f_test, delimiter='\t')
-	tsv_w_test.writerow(["text_a","text_b","label"])
+	tsv_w_test.writerow(["text_a","text_b", "text_c", "label"])
 	tsv_w_test.writerows(test_list)
 
 # 平台测试使用的test.txt应该是和train.txt相同的格式，只是少了预测标签而已

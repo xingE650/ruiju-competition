@@ -512,6 +512,8 @@ class SequenceLabelReaderWithPremise(BaseReader):
         padded_task_ids = np.ones_like(
             padded_token_ids, dtype="int64") * self.task_id
 
+        # 这里返回的 return_list 里面元素的顺序必须和 pyreader 的 feed_list 一致...
+        # 这里的函数写的太细节了...
         return_list = [
             padded_token_ids, padded_text_type_ids, padded_position_ids,
             padded_task_ids, input_mask, padded_label_ids, batch_seq_lens
@@ -555,15 +557,23 @@ class SequenceLabelReaderWithPremise(BaseReader):
         if isinstance(example, tuple):
             tokens_a = tokenization.convert_to_unicode(example.text_a).split(u" ")
             tokens_b = tokenization.convert_to_unicode(example.text_b).split(u" ")
+            tokens_c = tokenization.convert_to_unicode(example.text_c).split(u" ")
+
         # 因为 predictor.py 预测结果的时候，读入的是 txt 格式，训练的时候读入是 tsv 格式
         # 所以在数据解析的时候有一些差别
         elif isinstance(example, dict):
             tokens_a = tokenization.convert_to_unicode(example["text_a"]).split(u" ")
             tokens_b = tokenization.convert_to_unicode(example["text_b"]).split(u" ")
+            tokens_c = tokenization.convert_to_unicode(example["text_c"]).split(u" ")
+            
         if len(tokens_a)+len(tokens_b) +3>max_seq_length:
-            # 裁剪 text_a 和 text_b 来保证最大长度
+            # 裁剪 text_a 和 text_b 来保证最大长
             self._truncate_seq_pair(tokens_a,tokens_b,max_seq_length)
-
+        
+        if len(tokens_a)+len(tokens_c) +3>max_seq_length:
+            # 裁剪 text_a 和 text_c 来保证最大长
+            self._truncate_seq_pair(tokens_a,tokens_c,max_seq_length)
+            
         if self.is_inference:
             labels = ["O" for i in range(len(tokens_a)+len(tokens_b))]
         else:
@@ -573,6 +583,9 @@ class SequenceLabelReaderWithPremise(BaseReader):
         # 获得 text_a text_b 以及对应的 label ，主要是训练的时候用
         tokens_a, labels_a = self._reseg_token_label(tokens_a, labels_a, tokenizer)
         tokens_b, labels_b = self._reseg_token_label(tokens_b, labels_b, tokenizer)
+        # 仿照 text_b 的操作，对 text_c 进行同理操作
+        tokens_c, labels_b = self._reseg_token_label(tokens_c, labels_b, tokenizer)
+        
         while True:
             if len(tokens_a)+len(tokens_b)+3>max_seq_length:
                 if len(tokens_a) > len(tokens_b):
@@ -580,6 +593,8 @@ class SequenceLabelReaderWithPremise(BaseReader):
                     labels_a.pop()
                 else:
                     tokens_b.pop()
+                    # 因为 tokens_c 和 tokens_b 长度相同，所以操作相同
+                    tokens_c.pop()
                     labels_b.pop()
 
             else : break
@@ -588,6 +603,10 @@ class SequenceLabelReaderWithPremise(BaseReader):
         tokens = ["[CLS]"] + tokens_a + ["[SEP]"]+tokens_b+["[SEP]"]
         # 将 token 转换为 token_id ，通过 vocab 来实现
         token_ids = tokenizer.convert_tokens_to_ids(tokens)
+
+        # 将 tokens_c 也进行上面一步的操作
+        candidate_ids = tokenizer.convert_tokens_to_ids(tokens_c)
+
         # 将每个 token 的位置进行编码，也作为特征
         position_ids = list(range(len(token_ids)))
         text_type_ids = [0] * len(token_ids)
@@ -601,7 +620,7 @@ class SequenceLabelReaderWithPremise(BaseReader):
 
         Record = namedtuple(
             'Record',
-            ['token_ids', 'text_type_ids', 'position_ids', 'label_ids'])
+            ['token_ids', 'text_type_ids', 'position_ids', 'candidate_ids', 'label_ids'])
         record = Record(
             # token_ids 是将 text_a 和 text_b 拼接在一起，然后将整体的 tokens 转换得到的 token_ids
             token_ids=token_ids,
@@ -609,6 +628,8 @@ class SequenceLabelReaderWithPremise(BaseReader):
             text_type_ids=text_type_ids,
             # position_ids 是将 tokens 的位置进行了编码，比如 tokens=['f','x','x','k'] -> position_ids=[0,1,2,3]
             position_ids=position_ids,
+            # candidate_ids 是将 tokens_c 的 tokens 转化为 对应的 token_ids
+            candidate_ids=candidate_ids,
             # label_ids 是序列标注的 label 通过 data/label_map.json 映射得到的
             label_ids=label_ids)
         return record
