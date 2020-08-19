@@ -27,7 +27,7 @@ import paddle.fluid as fluid
 from io import open
 from paddle.fluid.layers import core
 
-from model.transformer_encoder import encoder, pre_process_layer
+from model.transformer_encoder import encoder, pre_process_layer, multi_head_attention
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +58,7 @@ class ErnieModel(object):
     def __init__(self,
                  src_ids,
                  position_ids,
+                 candidate_ids,
                  sentence_ids,
                  task_ids,
                  input_mask,
@@ -110,11 +111,11 @@ class ErnieModel(object):
             # scale 正态分布的标准差
             scale=config['initializer_range'])
 
-        self._build_model(src_ids, position_ids, sentence_ids, task_ids,
+        self._build_model(src_ids, position_ids, candidate_ids, sentence_ids, task_ids,
                           input_mask)
 
-    def _build_model(self, src_ids, position_ids, sentence_ids, task_ids,
-                     input_mask):
+    def _build_model(self, src_ids, position_ids, candidate_ids, sentence_ids, task_ids,
+                     input_mask, use_dot_attention=False):
         # padding id in vocabulary must be set to 0
         emb_out = fluid.layers.embedding(
             input=src_ids,
@@ -132,6 +133,19 @@ class ErnieModel(object):
             dtype=self._emb_dtype,
             param_attr=fluid.ParamAttr(
                 name=self._pos_emb_name, initializer=self._param_initializer))
+        
+        if use_dot_attention:
+            # candidate_emb_out 指的是只包含被告人信息（其他位置都使用[PAD]填充）的词嵌入向量
+            # 在非 Dygraph 模式下，那么同一个 Block 中的两个或更多 Variable 拥有相同 name 将意味着他们会共享相同的内容
+            # 因此这里我觉得直接把 name 设置成 self._word_emb_name 应该就可以使用 ERNIE 的词嵌入预训练模型参数了
+            candidate_emb_out = fluid.layers.embedding(
+                input=candidate_ids,
+                size=[self._voc_size, self._emb_size],
+                dtype=self._emb_dtype,
+                param_attr=fluid.ParamAttr(
+                    # 同样使用 self._word_emb_name 来从 ERNIE 读取预训练词嵌入模型
+                    name=self._word_emb_name, initializer=self._param_initializer),
+                is_sparse=False)
 
         # 配置文件里面并没有指定 sent_type_vocab_size ，所以实际上embedding矩阵的维度是 [2, self._emb_size]
         sent_emb_out = fluid.layers.embedding(
@@ -143,8 +157,14 @@ class ErnieModel(object):
 
         # 词嵌入+位置嵌入+句子类型嵌入 作为输入
         # 不过最后一个好像没什么用...
+        # 这里是不是也可以把前面的 candidate_emb_out 加进来试试呢？
         emb_out = emb_out + position_emb_out
         emb_out = emb_out + sent_emb_out
+
+        if use_dot_attention:
+            # 给 candidate_emb_out 也加上位置信息
+            candidate_emb_out = candidate_emb_out + position_emb_out
+            candidate_emb_out = candidate_emb_out + sent_emb_out
 
         # 没有 task_id 不用看了
         if self._use_task_id:
@@ -161,10 +181,20 @@ class ErnieModel(object):
         # 将 emb_out 进行 layer normalization 和 dropout
         emb_out = pre_process_layer(
             emb_out, 'nd', self._prepostprocess_dropout, name='pre_encoder')
+        
+
+        if use_dot_attention:
+            # 将 candidate_emb_out 也和词嵌入 emb_out 一样，进行 layer normalization 和 dropout
+            candidate_emb_out = pre_process_layer(
+                candidate_emb_out, 'nd', self._prepostprocess_dropout, name='pre_encoder')
 
         if self._dtype == core.VarDesc.VarType.FP16:
             emb_out = fluid.layers.cast(x=emb_out, dtype=self._dtype)
             input_mask = fluid.layers.cast(x=input_mask, dtype=self._dtype)
+
+            if use_dot_attention:
+                # candidate_emb_out 也做同样的转换
+                candidate_emb_out = fluid.layers.cast(x=candidate_emb_out, dtype=self._dtype)
         
         # input_mask**2 ?
         self_attn_mask = fluid.layers.matmul(
@@ -202,11 +232,43 @@ class ErnieModel(object):
         if self._dtype == core.VarDesc.VarType.FP16:
             self._enc_out = fluid.layers.cast(
                 x=self._enc_out, dtype=self._emb_dtype)
+        
+        if use_dot_attention:
+            # 让 candidate_ids 也通过 transformer-encoder
+            self._candidate_enc_out = encoder(
+                enc_input=candidate_emb_out,
+                attn_bias=n_head_self_attn_mask,
+                n_layer=self._n_layer,
+                n_head=self._n_head,
+                d_key=self._emb_size // self._n_head,
+                d_value=self._emb_size // self._n_head,
+                d_model=self._emb_size,
+                d_inner_hid=self._emb_size * 4,
+                prepostprocess_dropout=self._prepostprocess_dropout,
+                attention_dropout=self._attention_dropout,
+                relu_dropout=0,
+                hidden_act=self._hidden_act,
+                # 所有的preprocess不进行操作
+                preprocess_cmd="",
+                # 所有的postprocess进行 dropout+残差连接+layer normalization
+                postprocess_cmd="dan",
+                param_initializer=self._param_initializer,
+                name='encoder')
+            if self._dtype == core.VarDesc.VarType.FP16:
+                self._candidate_enc_out = fluid.layers.cast(
+                    x=self._candidate_enc_out, dtype=self._emb_dtype)
 
     # 这里的 get_sequence_output 其实是 encoder 的输出
-    # 在下游代码 finetune/sequence_label.py 中，其实只有这个函数接口被用到了
+    # 在下游代码 finetune/sequence_label.py 中，直接调用这个接口就可以获得 transformer-encoder 的输出
     def get_sequence_output(self):
         return self._enc_out
+    
+    # 该函数将 encoder 输出结果 self._enc_out 和 self._candidate_enc_out 进行 dot-attention
+    # 前提是构建模型的时候要使能 use_dot_attention
+    # 其实那部分代码应该放到这里比较合适，但是需要把参数都传递过来，偷懒就直接写在 _build_model 函数里面了
+    def candidate_dot_attention(self):
+        pass
+
 
     def get_pooled_output(self):
         """Get the first feature of each sequence for classification"""

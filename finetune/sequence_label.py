@@ -47,18 +47,23 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
     labels = fluid.layers.data(name='labels', shape=[-1, args.max_seq_len, 1], dtype='int64')
     seq_lens = fluid.layers.data(name='seq_lens', shape=[-1], dtype='int64')
 
+    # 加上 candidate_ids , 用来接收被告人集合的输入信息
+    candidate_ids = fluid.layers.data(name='candidate_ids', shape=[-1, args.max_seq_len, 1], dtype='int64')
+
     # 该方法会返回一个 DataLoader 对象
     # feed_list 参数： python list|tuple of Variables ，列表元素都由 fluid.layers.data() 创建
     # capacity 参数：  DataLoader 对象内部维护队列的容量大小。单位是 batch 数量。若 reader 读取速度较快，建议设置较大的 capacity
     # iterable 参数：  所创建的 DataLoader 对象是否可迭代，默认参数是 True
-    pyreader = fluid.io.DataLoader.from_generator(feed_list=[src_ids, sent_ids, pos_ids, task_ids, input_mask, labels, seq_lens], 
+    pyreader = fluid.io.DataLoader.from_generator(feed_list=[src_ids, sent_ids, pos_ids, task_ids, input_mask, labels, seq_lens, candidate_ids], 
             capacity=70,
             iterable=False)
 
     # ernie 对象会创建 baseline 使用的基于 transformer 的 encoder-decoder 模型
+    # 给 ErnieModel 的输入加上 candidate_ids ，用来对 encoder 输出结果做 dot-attention
     ernie = ErnieModel(
         src_ids=src_ids,
         position_ids=pos_ids,
+        candidate_ids=candidate_ids,
         sentence_ids=sent_ids,
         task_ids=task_ids,
         input_mask=input_mask,

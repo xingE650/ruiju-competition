@@ -484,6 +484,7 @@ class SequenceLabelReaderWithPremise(BaseReader):
         batch_text_type_ids = [record.text_type_ids for record in batch_records]
         batch_position_ids = [record.position_ids for record in batch_records]
         batch_label_ids = [record.label_ids for record in batch_records]
+        batch_candidate_ids = [record.candidate_ids for record in batch_records]
         # padding
         padded_token_ids, input_mask, batch_seq_lens = pad_batch_data(
             batch_token_ids,
@@ -501,6 +502,12 @@ class SequenceLabelReaderWithPremise(BaseReader):
             batch_position_ids,
             max_seq_len=self.max_seq_len,
             pad_idx=self.pad_id)
+        
+        padded_candidate_ids = pad_batch_data(
+            batch_candidate_ids,
+            max_seq_len=self.max_seq_len,
+            pad_idx=self.pad_id)
+
         if self.is_inference:
             padded_label_ids = np.zeros(shape=(len(padded_token_ids),len(padded_token_ids[0]),1), dtype="int64")
         else:
@@ -514,9 +521,11 @@ class SequenceLabelReaderWithPremise(BaseReader):
 
         # 这里返回的 return_list 里面元素的顺序必须和 pyreader 的 feed_list 一致...
         # 这里的函数写的太细节了...
+        # 再末尾加上 padded_candidate_ids , 注意需要同时在 finetune/sequence_label.py 的 create_model 函数中
+        # pyreader 对象的 feed_list 参数末尾加上 candidate_ids
         return_list = [
             padded_token_ids, padded_text_type_ids, padded_position_ids,
-            padded_task_ids, input_mask, padded_label_ids, batch_seq_lens
+            padded_task_ids, input_mask, padded_label_ids, batch_seq_lens, padded_candidate_ids
         ]
         return return_list
 
@@ -605,6 +614,8 @@ class SequenceLabelReaderWithPremise(BaseReader):
         token_ids = tokenizer.convert_tokens_to_ids(tokens)
 
         # 将 tokens_c 也进行上面一步的操作
+        # 至此， candidate_ids 的长度和 tokens_ids 一致了
+        tokens_c = ["[CLS]"] + ["[PAD]" for _ in tokens_a] + ["[SEP]"]+tokens_c+["[SEP]"]
         candidate_ids = tokenizer.convert_tokens_to_ids(tokens_c)
 
         # 将每个 token 的位置进行编码，也作为特征
