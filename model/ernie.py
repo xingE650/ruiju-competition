@@ -112,7 +112,7 @@ class ErnieModel(object):
             scale=config['initializer_range'])
 
         self._build_model(src_ids, position_ids, candidate_ids, sentence_ids, task_ids,
-                          input_mask)
+                          input_mask, use_dot_attention=True)
 
     def _build_model(self, src_ids, position_ids, candidate_ids, sentence_ids, task_ids,
                      input_mask, use_dot_attention=False):
@@ -259,7 +259,7 @@ class ErnieModel(object):
                     x=self._candidate_enc_out, dtype=self._emb_dtype)
             
             # 通过 dot-attention 将被告人信息加入 self._enc_out
-            self.candidate_dot_attention(n_head_self_attn_mask)
+            self.candidate_dot_attention()
 
     # 这里的 get_sequence_output 其实是 encoder 的输出
     # 在下游代码 finetune/sequence_label.py 中，直接调用这个接口就可以获得 transformer-encoder 的输出
@@ -269,17 +269,17 @@ class ErnieModel(object):
     # 该函数将 encoder 输出结果 self._enc_out 和 self._candidate_enc_out 进行 dot-attention
     # 前提是构建模型的时候要使能 use_dot_attention
     # 其实那部分代码应该放到这里比较合适，但是需要把参数都传递过来，偷懒就直接写在 _build_model 函数里面了
-    def candidate_dot_attention(self, n_head_self_attn_mask):
+    def candidate_dot_attention(self):
 
         self._enc_out = multi_head_attention(
             queries=self._candidate_enc_out,
             keys=self._enc_out,
-            values=self._enc_out,
-            attn_bias=n_head_self_attn_mask,
-            d_key=self._emb_size // self._n_head,
-            d_value=self._emb_size // self._n_head,
+            values=None,
+            attn_bias=None,
+            d_key=self._emb_size // 1,
+            d_value=self._emb_size // 1,
             d_model=self._emb_size,
-            n_head=self._n_head,
+            n_head=1,
             dropout_rate=self._attention_dropout,
             cache=None,
             param_initializer=self._param_initializer,
