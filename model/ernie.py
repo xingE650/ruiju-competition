@@ -234,6 +234,8 @@ class ErnieModel(object):
                 x=self._enc_out, dtype=self._emb_dtype)
         
         if use_dot_attention:
+            self._candidate_enc_out = candidate_emb_out
+            '''
             # 让 candidate_ids 也通过 transformer-encoder
             self._candidate_enc_out = encoder(
                 enc_input=candidate_emb_out,
@@ -257,7 +259,7 @@ class ErnieModel(object):
             if self._dtype == core.VarDesc.VarType.FP16:
                 self._candidate_enc_out = fluid.layers.cast(
                     x=self._candidate_enc_out, dtype=self._emb_dtype)
-            
+            '''
             # 通过 dot-attention 将被告人信息加入 self._enc_out
             self.candidate_dot_attention()
 

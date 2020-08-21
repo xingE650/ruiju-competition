@@ -18,7 +18,7 @@ if __name__ == '__main__':
 			records.append(record)
 	# '''
 	p = Predictor()
-	result = p .predict(records=records)
+	result = p.predict(records=records)
 
 	with open("./data/test_answer_baseline.txt","w",encoding="UTF-8") as f:
 		for _result in result:

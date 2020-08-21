@@ -27,6 +27,8 @@ import numpy as np
 import six
 from io import open
 from collections import namedtuple
+import re
+from data_utils.gen_train_test import item2example
 
 import tokenization
 from batching_mod import pad_batch_data
@@ -292,6 +294,7 @@ class BaseReader(object):
                 traceback.print_exc()
         return f
 
+    # data_generator_json 读入数据的方法有些诡异...决定改为和train的时候一样的操作
     def data_generator_json(self,
                        input_json,
                        batch_size,
@@ -304,8 +307,10 @@ class BaseReader(object):
         examples = []
         for item in examples_org:
             example={}
-            example["text_a"]= item["要素原始值"]
-            example["text_b"]= item["句子"]
+            example["text_a"], example["text_b"], example["text_c"], _= item2example(item,phase='predict')
+            # example["text_a"] = item["要素原始值"]
+            # example["text_b"] = item["句子"]
+            # example["text_c"] = item["句子"]
             examples.append(example)
         def wrapper():
             all_dev_batches = []

@@ -20,7 +20,7 @@ python save_model.py --init_checkpoint ./checkpoints/sequecneLabelingWithPremise
 
 压缩的时候不要压缩预训练模型和checkpoints（有500MB的提交限制），使用下面的命令操作：
 ```bash
-zip -r  predictor.zip ./ -rx=ERNIE_stable-1.0.1/params/* -rx=checkpoints/* -rx=__pycache__/*
+zip -r  predictor.zip ./ -rx=ERNIE_stable-1.0.1/params/* -rx=checkpoints/* -rx=__pycache__/* -rx=.git/*
 ```
 
 比赛需要提交预测代码，测试环境和这个项目环境相同，需要提供推理模型来供调用。比赛测试平台是CPU平台，而且评估结果会受到提交人数

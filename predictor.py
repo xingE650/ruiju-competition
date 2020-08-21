@@ -69,7 +69,7 @@ data_g.add_arg("do_lower_case",       bool, True,
                "Whether to lower case the input text. Should be True for uncased models and False for cased models.")
 
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
-run_type_g.add_arg("use_cuda",          bool,   False,  "If set, use GPU for training.")
+run_type_g.add_arg("use_cuda",          bool,   True,  "If set, use GPU for predicting.")
 run_type_g.add_arg("do_prediction",     bool,   True,  "Whether to do prediction on test set.")
 
 args = parser.parse_args()
@@ -129,13 +129,17 @@ class Predictor():
             input_mask = sample[4]
             labels = sample[5]
             len_seqs = sample[6]
+            candidate_ids = sample[7]
             inputs = [self.array2tensor(ndarray) for ndarray in [src_ids, sent_ids, pos_ids,input_mask]]
             begin_time = time.time()
+            # print("-----------------fuck attention-----------------")
+            # print(feed_target_names)
             outputs =  exe.run(inference_program,
                         feed={feed_target_names[0]: src_ids,
                                 feed_target_names[1]: sent_ids,
                                 feed_target_names[2]: pos_ids,
-                                feed_target_names[3]: input_mask},
+                                feed_target_names[3]: input_mask,
+                                feed_target_names[4]: candidate_ids,},
                         fetch_list=fetch_targets)
             end_time = time.time()
             total_time += end_time - begin_time

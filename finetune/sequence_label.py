@@ -101,7 +101,7 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
     #  predictor.py 中使用 load_inference_model 读取前一步保存的模型， 因此可以认为 feed_targets_name 主要在预测阶段使用
     if is_prediction:
         feed_targets_name = [
-            src_ids.name, sent_ids.name,  pos_ids.name,input_mask.name
+            src_ids.name, sent_ids.name,  pos_ids.name,input_mask.name, candidate_ids.name
         ]
     else:
         feed_targets_name = []
