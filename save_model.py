@@ -127,6 +127,7 @@ fluid.io.save_inference_model(
 	model_path,
 	feed_target_names, [value for key, value in probs.items()],
 	exe,
-	params_filename="weights",
+	# params_filename="weights",
+	params_filename=None,
 	main_program=predict_prog)
 ##end save model

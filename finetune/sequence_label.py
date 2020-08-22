@@ -219,7 +219,7 @@ def evaluate(exe,
     time_end = time.time()
     return  \
         "[evaluation] f1: %f, precision: %f, recall: %f, elapsed time: %f s" \
-        % (f1, precision, recall, time_end - time_begin)
+        % (f1, precision, recall, time_end - time_begin), f1
 
 
 def chunk_predict( np_probs, np_lens, dev_count=1):

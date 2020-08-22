@@ -45,8 +45,11 @@ from finetune_args import parser
 args = parser.parse_args()
 log = logging.getLogger()
 
+global_save = False
+global_f1 = 0.0
 
 def main(args):
+	global global_save
 	# 从 ernie_config_path 读取配置文件，主要是定义了网络模型的参数
 	# 比如 dropout 概率、激活函数类型 etc.
 	ernie_config = ErnieConfig(args.ernie_config_path)
@@ -342,6 +345,11 @@ def main(args):
 						predict_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
 						                current_epoch, steps)
 
+					if global_save == True:
+						global_save = False
+						save_path = os.path.join(args.checkpoints,
+												 'best_f1')
+						fluid.io.save_persistables(exe, save_path, train_program)
 
 			except fluid.core.EOFException:
 				save_path = os.path.join(args.checkpoints, "step_" + str(steps))
@@ -366,6 +374,7 @@ def main(args):
 def evaluate_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
                      epoch, steps):
 	# evaluate dev set
+	global global_save, global_f1
 	batch_size = args.batch_size if args.predict_batch_size is None else args.predict_batch_size
 	for ds in args.dev_set.split(','):  # single card eval
 		test_pyreader.set_batch_generator(
@@ -376,8 +385,11 @@ def evaluate_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
 				dev_count=1,
 				shuffle=False))
 		log.info("validation result of dataset {}:".format(ds))
-		info = evaluate(exe, test_prog, test_pyreader, graph_vars,
+		info,temp_f1 = evaluate(exe, test_prog, test_pyreader, graph_vars,
 		                args.num_labels)
+		if temp_f1 > global_f1:
+			global_f1 = temp_f1
+			global_save = True
 		log.info(info + ', file: {}, epoch: {}, steps: {}'.format(
 			ds, epoch, steps))
 
@@ -420,3 +432,17 @@ if __name__ == '__main__':
     print_arguments(args)
     check_cuda(args.use_cuda)
     main(args)
+    print('-------------------------- fuck attention ----------------------')
+    print('-------------------------- fuck attention ----------------------')
+    print('-------------------------- fuck attention ----------------------')
+    print('-------------------------- fuck attention ----------------------')
+    print('-------------------------- fuck attention ----------------------')
+    print('-------------------------- fuck attention ----------------------')
+    print(global_f1)
+    print('-------------------------- fuck attention ----------------------')
+    print('-------------------------- fuck attention ----------------------')
+    print('-------------------------- fuck attention ----------------------')
+    print('-------------------------- fuck attention ----------------------')
+    print('-------------------------- fuck attention ----------------------')
+    print('-------------------------- fuck attention ----------------------')
+	

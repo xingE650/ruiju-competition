@@ -421,6 +421,42 @@ class SequenceLabelReaderWithPremise(BaseReader):
         assert len(ret_tokens) == len(ret_labels)
         return ret_tokens, ret_labels
 
+    def check_zero(self, position_ids, tokens_b, tokens_a):
+        # 从tokens_b 中找到 tokens_a 的 最长公共子串， 公共子串的起点作为零点
+        # 利用这个零点对 position_ids 进行 校零
+        find_zero = -1
+        max_len = 1
+        max_end = 0
+        dp = np.zeros((1+len(tokens_b), 1+len(tokens_a)))
+        for i in range(1,1+len(tokens_b)):
+            for j in range(1, 1+len(tokens_a)):
+                if tokens_b[i-1] == tokens_a[j-1]:
+                    dp[i][j] = dp[i-1][j-1] + 1
+                    if dp[i][j] > max_len:
+                        max_len = int(dp[i][j])
+                        max_end = i-1
+        # 还有长度为 0 的 text_a ...
+        if max_len >= 1:
+            find_zero = max_end - max_len + 1
+        # print(type(find_zero))
+        # print(type(max_end))
+        # print(tokens_b[find_zero: 1+max_end])
+        # 找到了tokens_a 的起点
+        assert (find_zero != -1 and max_len>=1), "not find tokens_a in tokens"+str(tokens_b)+'\n'+str(tokens_a)
+        if find_zero != -1:
+            find_zero = 2+len(tokens_a) + find_zero
+            k = position_ids[find_zero]+1
+            for i in range(len(position_ids)):
+                if i < find_zero:
+                    continue
+                elif i >= find_zero and i< find_zero + max_len:
+                    position_ids[i] = position_ids[find_zero]
+                else:
+                    position_ids[i] = k
+                    k += 1
+        # return position_ids
+
+
     def _convert_example_to_record(self, example, max_seq_length, tokenizer):
         if isinstance(example, tuple):
             tokens_a = tokenization.convert_to_unicode(example.text_a).split(u" ")
@@ -458,9 +494,9 @@ class SequenceLabelReaderWithPremise(BaseReader):
         # 这个地方果然有毒，去掉吧，全是填充物有什么好操作的...
         # 但是不操作，会出现一些奇怪的字符，所以还是看看问题在哪吧...
         # labels_c 没有用，只是做个占位符...
-        # 但是这样仍然不能保证 tokens_c 和 tokens_b 长度一致，所以需要额外操作一下，必须让二者长度一致才行...
         tokens_c, labels_c = self._reseg_token_label(tokens_c, labels_c, tokenizer)
         
+        # 必须保证 tokens_c 和 tokens_b 长度一致
         if len(tokens_c) > len(tokens_b):
             tokens_c = tokens_c[:len(tokens_b)]
         elif len(tokens_c) < len(tokens_b):
@@ -481,7 +517,7 @@ class SequenceLabelReaderWithPremise(BaseReader):
 
             else : break
 
-        # 这一步在 NLP 里面好像用的比较多，是什么意思呢？
+        # tokens_a 和 tokens_b 进行拼接
         tokens = ["[CLS]"] + tokens_a + ["[SEP]"]+tokens_b+["[SEP]"]
         # 将 token 转换为 token_id ，通过 vocab 来实现
         token_ids = tokenizer.convert_tokens_to_ids(tokens)
@@ -493,6 +529,7 @@ class SequenceLabelReaderWithPremise(BaseReader):
 
         # 将每个 token 的位置进行编码，也作为特征
         position_ids = list(range(len(token_ids)))
+        self.check_zero(position_ids, tokens_b, tokens_a)
         text_type_ids = [0] * len(token_ids)
         no_entity_id = len(self.label_map) - 1
         label_ids = [no_entity_id] + [

@@ -272,7 +272,6 @@ class ErnieModel(object):
     # 前提是构建模型的时候要使能 use_dot_attention
     # 其实那部分代码应该放到这里比较合适，但是需要把参数都传递过来，偷懒就直接写在 _build_model 函数里面了
     def candidate_dot_attention(self):
-
         self._enc_out = multi_head_attention(
             queries=self._candidate_enc_out,
             keys=self._enc_out,
@@ -286,7 +285,6 @@ class ErnieModel(object):
             cache=None,
             param_initializer=self._param_initializer,
             name='encoder_dot_att')
-
 
     def get_pooled_output(self):
         """Get the first feature of each sequence for classification"""

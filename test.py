@@ -25,8 +25,8 @@ if __name__ == '__main__':
 			line = ""
 			for __bgr in _result:
 				if line != "":
-					line = line+","
-				line = __bgr
+					line = line + ","
+				line = line + __bgr
 			f.write(line)
 			f.write("\n")
 

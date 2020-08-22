@@ -28,6 +28,7 @@ import multiprocessing
 import sys
 import json
 import re
+import time
 sys.path.append(".")
 sys.path.append("..")
 # NOTE(paddle-dev): All of these flags should be
@@ -101,12 +102,14 @@ class Predictor():
             in_tokens=False,
             is_inference=True)
         index_char = self.load_vocab()
+        # print(index_char)
 
         exe = fluid.Executor(place)
         # exe = fluid.Executor(fluid.CUDAPlace(0)) # CUDAPlace(0) CPUPlace()
         path = self.args.init_checkpoint
+        # 设置 params_filename=None, 这样保存和读取的inference model是分散保存的
         [inference_program, feed_target_names, fetch_targets] =\
-            fluid.io.load_inference_model(dirname=path, executor=exe,model_filename="__model__",params_filename="weights")
+            fluid.io.load_inference_model(dirname=path, executor=exe,model_filename="__model__",params_filename=None)
 
         predict_data_generator = reader.data_generator_json(
             input_json = records,
@@ -119,6 +122,7 @@ class Predictor():
         res = []
 
         index =0
+        count = 0
         for sample in predict_data_generator():
             index=index+1
             #this is one batch of data
@@ -150,13 +154,17 @@ class Predictor():
                 persons = []
                 _person = ""
                 for _index, _label in enumerate(single_example):
-                    if _label !=2 :
+                    
+                    if _label == 1 or _label == 0:
                         _person = _person + index_char[src_ids[outer_index][_index][0]]
+                        # print(_person)
                     else:
+                        # print(_person)
                         if _person != "" :
                             persons.append(_person)
                             _person = ""
-                # print(persons)
+                # print(_person)
+
                 bgrjh = []
                 record = records[(index-1)*self.args.batch_size+outer_index]
                 _bgrjh = record["被告人集合"]
@@ -178,16 +186,16 @@ class Predictor():
                     if not find:
                         for _bgr in bgrjh:
                             if _bgr.find(_person)>-1:
-                                personList.append(_person)
+                                personList.append(_bgr)
                                 break
                             elif _person.find(_bgr)>-1:
-                                personList.append(_person)
+                                personList.append(_bgr)
                                 break
+                personList = list(set(personList))
                 #如果模型没有取到，用句子中的人名
                 if len(personList) ==0:
                     for _bgr in bgrjh:
                         personList.append(_bgr)
-
                 res.append(personList)
         return res
 
