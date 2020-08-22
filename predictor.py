@@ -146,7 +146,7 @@ class Predictor():
                 persons = []
                 _person = ""
                 for _index, _label in enumerate(single_example):
-                    if _label !=2 :
+                    if _label == 0 or _label == 1:
                         _person = _person + index_char[src_ids[outer_index][_index][0]]
                     else:
                         if _person != "" :
@@ -174,10 +174,10 @@ class Predictor():
                     if not find:
                         for _bgr in bgrjh:
                             if _bgr.find(_person)>-1:
-                                personList.append(_person)
+                                personList.append(_bgr)
                                 break
                             elif _person.find(_bgr)>-1:
-                                personList.append(_person)
+                                personList.append(_bgr)
                                 break
                 #如果模型没有取到，用句子中的人名
                 if len(personList) ==0:
