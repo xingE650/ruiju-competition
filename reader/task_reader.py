@@ -529,7 +529,8 @@ class SequenceLabelReaderWithPremise(BaseReader):
 
         # 将每个 token 的位置进行编码，也作为特征
         position_ids = list(range(len(token_ids)))
-        self.check_zero(position_ids, tokens_b, tokens_a)
+        # check_zero 会降低算法性能，不再使用
+        # self.check_zero(position_ids, tokens_b, tokens_a)
         text_type_ids = [0] * len(token_ids)
         no_entity_id = len(self.label_map) - 1
         label_ids = [no_entity_id] + [
