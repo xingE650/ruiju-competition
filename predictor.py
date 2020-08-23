@@ -69,7 +69,7 @@ data_g.add_arg("do_lower_case",       bool, True,
                "Whether to lower case the input text. Should be True for uncased models and False for cased models.")
 
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
-run_type_g.add_arg("use_cuda",          bool,   False,  "If set, use GPU for training.")
+run_type_g.add_arg("use_cuda",          bool,   True,  "If set, use GPU for training.")
 run_type_g.add_arg("do_prediction",     bool,   True,  "Whether to do prediction on test set.")
 
 args = parser.parse_args()
@@ -179,6 +179,7 @@ class Predictor():
                             elif _person.find(_bgr)>-1:
                                 personList.append(_bgr)
                                 break
+                personList = list(set(personList))
                 #如果模型没有取到，用句子中的人名
                 if len(personList) ==0:
                     for _bgr in bgrjh:
