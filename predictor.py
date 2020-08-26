@@ -133,7 +133,6 @@ class Predictor():
             input_mask = sample[4]
             labels = sample[5]
             len_seqs = sample[6]
-            candidate_ids = sample[7]
             inputs = [self.array2tensor(ndarray) for ndarray in [src_ids, sent_ids, pos_ids,input_mask]]
             begin_time = time.time()
             # print("-----------------fuck attention-----------------")
@@ -142,8 +141,7 @@ class Predictor():
                         feed={feed_target_names[0]: src_ids,
                                 feed_target_names[1]: sent_ids,
                                 feed_target_names[2]: pos_ids,
-                                feed_target_names[3]: input_mask,
-                                feed_target_names[4]: candidate_ids,},
+                                feed_target_names[3]: input_mask,},
                         fetch_list=fetch_targets)
             end_time = time.time()
             total_time += end_time - begin_time

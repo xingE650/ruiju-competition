@@ -226,8 +226,6 @@ class BaseReader(object):
             record = self._convert_example_to_record(example, self.max_seq_len,
                                                      self.tokenizer)
 
-            log_prefix = "---------------------attention!!!-----------------------\n"
-            assert (len(record.token_ids) == len(record.candidate_ids)) , log_prefix+"token_ids length: {:d} vs. candidate_ids length: {:d}\n".format(len(record.token_ids), len(record.candidate_ids))
 
             max_len = max(max_len, len(record.token_ids))
             if max_len >self.max_seq_len:
@@ -235,9 +233,6 @@ class BaseReader(object):
             if len(record.token_ids)>max_len:
                 # token_ids 长度超过 self.max_seq_len 后进行裁剪
                 record.token_ids = record.token_ids[:max_len-1]
-            
-            if len(record.candidate_ids)>max_len:
-                record.candidate_ids = record.candidate_ids[:max_len-1]
 
 		    # If set, the batch size will be the maximum number of tokens in one batch. Otherwise, it will be the maximum number of examples in one batch.
             if self.in_tokens:
@@ -340,7 +335,6 @@ class SequenceLabelReaderWithPremise(BaseReader):
         batch_text_type_ids = [record.text_type_ids for record in batch_records]
         batch_position_ids = [record.position_ids for record in batch_records]
         batch_label_ids = [record.label_ids for record in batch_records]
-        batch_candidate_ids = [record.candidate_ids for record in batch_records]
         # padding
         padded_token_ids, input_mask, batch_seq_lens = pad_batch_data(
             batch_token_ids,
@@ -359,10 +353,6 @@ class SequenceLabelReaderWithPremise(BaseReader):
             max_seq_len=self.max_seq_len,
             pad_idx=self.pad_id)
         
-        padded_candidate_ids = pad_batch_data(
-            batch_candidate_ids,
-            max_seq_len=self.max_seq_len,
-            pad_idx=self.pad_id)
 
         if self.is_inference:
             padded_label_ids = np.zeros(shape=(len(padded_token_ids),len(padded_token_ids[0]),1), dtype="int64")
@@ -377,11 +367,9 @@ class SequenceLabelReaderWithPremise(BaseReader):
 
         # 这里返回的 return_list 里面元素的顺序必须和 pyreader 的 feed_list 一致...
         # 这里的函数写的太细节了...
-        # 再末尾加上 padded_candidate_ids , 注意需要同时在 finetune/sequence_label.py 的 create_model 函数中
-        # pyreader 对象的 feed_list 参数末尾加上 candidate_ids
         return_list = [
             padded_token_ids, padded_text_type_ids, padded_position_ids,
-            padded_task_ids, input_mask, padded_label_ids, batch_seq_lens, padded_candidate_ids
+            padded_task_ids, input_mask, padded_label_ids, batch_seq_lens,
         ]
         return return_list
 
@@ -529,8 +517,6 @@ class SequenceLabelReaderWithPremise(BaseReader):
 
         # 将每个 token 的位置进行编码，也作为特征
         position_ids = list(range(len(token_ids)))
-        # check_zero 会降低算法性能，不再使用
-        # self.check_zero(position_ids, tokens_b, tokens_a)
         text_type_ids = [0] * len(token_ids)
         no_entity_id = len(self.label_map) - 1
         label_ids = [no_entity_id] + [
