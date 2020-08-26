@@ -114,8 +114,7 @@ if __name__ == "__main__":
 		# 这里是要做什么异常处理吗？没太明白
 		if len(new_text_a.split(" "))+len(new_text_b.split(" "))!= len(new_labels.split(" ")):
 			print (len(new_text_a.split(" ")),len(new_text_b.split(" ")),len(new_labels.split(" ")))
-		# 将 new_text_a(分词后的要素原始值)、new_text_b（分词后的句子）、new_text_c（和new_text_b长度一致，然后把被告人集合以外的内容换成[PAD]）、new_labels（序列标注标签）
-		train_list.append([new_text_a,new_text_b, new_text_c, new_labels])
+		train_list.append([new_text_a,new_text_b, new_labels])
 
 	# 随机抽取10%作为测试数据
 	prob = 0.1
@@ -128,11 +127,11 @@ if __name__ == "__main__":
 
 	with open(os.path.join(os.getcwd(), 'data', "ner_train.tsv"),"w",encoding="utf-8")as f_train:
 		tsv_w_train = csv.writer(f_train, delimiter='\t')
-		tsv_w_train.writerow(["text_a","text_b", "text_c", "label"])
+		tsv_w_train.writerow(["text_a","text_b", "label"])
 		tsv_w_train.writerows(train_list)
 	with open(os.path.join(os.getcwd(), 'data', "ner_test.tsv"),"w",encoding="utf-8")as f_test:
 		tsv_w_test = csv.writer(f_test, delimiter='\t')
-		tsv_w_test.writerow(["text_a","text_b", "text_c", "label"])
+		tsv_w_test.writerow(["text_a","text_b", "label"])
 		tsv_w_test.writerows(test_list)
 
 	# 平台测试使用的test.txt应该是和train.txt相同的格式，只是少了预测标签而已
