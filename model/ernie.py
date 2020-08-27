@@ -111,7 +111,7 @@ class ErnieModel(object):
             scale=config['initializer_range'])
 
         self._build_model(src_ids, position_ids, sentence_ids, task_ids,
-                          input_mask, use_lstm=False)
+                          input_mask, use_lstm=True)
 
     def _build_model(self, src_ids, position_ids, sentence_ids, task_ids,
                      input_mask, use_lstm=False):
@@ -165,7 +165,9 @@ class ErnieModel(object):
         emb_out = pre_process_layer(
             emb_out, 'nd', self._prepostprocess_dropout, name='pre_encoder')
         
-
+        if use_lstm:
+            assert (emb_out.shape[1]==512), "emb_out.shape[1] should be 512"
+            emb_out = self.biGRU(emb_out, src_sequence_length=512, hidden_dim=self._emb_size)
 
         if self._dtype == core.VarDesc.VarType.FP16:
             emb_out = fluid.layers.cast(x=emb_out, dtype=self._dtype)
@@ -184,6 +186,7 @@ class ErnieModel(object):
             x=[self_attn_mask] * self._n_head, axis=1)
         # stop_gradient=True 不进行参数更新
         n_head_self_attn_mask.stop_gradient = True
+
 
         self._enc_out = encoder(
             enc_input=emb_out,
@@ -204,10 +207,45 @@ class ErnieModel(object):
             postprocess_cmd="dan",
             param_initializer=self._param_initializer,
             name='encoder')
+        
+
+
         if self._dtype == core.VarDesc.VarType.FP16:
             self._enc_out = fluid.layers.cast(
                 x=self._enc_out, dtype=self._emb_dtype)
         
+
+
+    def biGRU(self, emb_out, src_sequence_length=512, hidden_dim=768):
+        emb_out = fluid.layers.fc(emb_out, size=hidden_dim, num_flatten_dims=2)
+
+        # 使用GRUCell构建前向RNN
+        encoder_fwd_cell = fluid.layers.GRUCell(hidden_size=hidden_dim)
+        encoder_fwd_output, fwd_state = fluid.layers.rnn(
+            cell=encoder_fwd_cell,
+            inputs=emb_out,
+            sequence_length=None,
+            time_major=False,
+            is_reverse=False)
+        # 使用GRUCell构建反向RNN
+        encoder_bwd_cell = fluid.layers.GRUCell(hidden_size=hidden_dim)
+        encoder_bwd_output, bwd_state = fluid.layers.rnn(
+            cell=encoder_bwd_cell,
+            inputs=emb_out,
+            sequence_length=None,
+            time_major=False,
+            is_reverse=True)
+        # 拼接前向与反向GRU的编码结果得到h
+        encoder_output = fluid.layers.concat(
+            input=[encoder_fwd_output, encoder_bwd_output], axis=2)
+        encoder_state = fluid.layers.concat(input=[fwd_state, bwd_state], axis=1)
+
+        encoder_output = fluid.layers.fc(encoder_output, size=hidden_dim, num_flatten_dims=2)
+        print(encoder_output.shape)
+
+        return encoder_output
+
+
 
 
     # 这里的 get_sequence_output 其实是 encoder 的输出
